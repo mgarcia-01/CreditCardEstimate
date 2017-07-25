@@ -15,6 +15,8 @@ censusAGEURL <- paste0("https://api.census.gov/data/2016/pep/natmonthly?get=POP,
 rm(APIKEY)
 
 library(jsonlite)
+
+### this is to parse the census for us population by state, no age.
 myjsoncensus <- jsonlite::fromJSON(txt = censusURL)
 uspop <- as.data.frame(myjsoncensus)
 names(uspop) <- as.character(unlist(uspop[1,]))
@@ -22,7 +24,7 @@ uspop <- uspop[-1,]
 uspop$POP <- as.numeric(as.character(uspop$POP))
 uspop$DENSITY <- as.numeric(as.character(uspop$DENSITY))
 
-
+### this is to parse the census for us population by age and month 
 myjsoncensusAGE <- jsonlite::fromJSON(txt = censusAGEURL)
 uspopAGE <- as.data.frame(myjsoncensusAGE)
 names(uspopAGE) <- as.character(unlist(uspopAGE[1,]))
@@ -34,8 +36,11 @@ uspopAGE$MONTHLY <- as.numeric(as.character(uspopAGE$MONTHLY))
 
 ######################## Credit Card Figures ######################
 # http://www.statisticbrain.com/credit-card-ownership-statistics/ #
+# Unused source:                                                  #
+#     https://wallethub.com/edu/number-of-credit-cards/25532/     #
 # Total number of credit cards in use in the US 	1,895,834,000   #
 # Total number of US credit card holders 	199,800,000             #
+# 
 ###################################################################
 
 
@@ -76,6 +81,23 @@ CensusEarlyAge <- sum(uspopAGEDist[which(uspopAGEDist$AGE >= 1 & uspopAGEDist$AG
 ### if there is a terminology for this.
 
 head(uspopAGEDist,10)
+
+tempset <- as.data.frame(basketTrend_DepAisle(department = "frozen", aisle = "ice cream ice"))
+av <- zoo::zoo(uspopAGEDist$POP)
+agelag <- as.data.frame(lag(av,k = -1, na.pad = TRUE))
+names(agelag) <- c("agelagyr")
+
+agelagcombined <-  as.data.frame(cbind(uspopAGEDist, agelag[1]))
+agelagcombined_pct <-  as.data.frame(((agelagcombined$POP - agelagcombined$agelagyr)
+                                      /agelagcombined$agelagyr)*100)
+names(agelagcombined_pct) <- c("pct_chg")
+agelagcombined <-  as.data.frame(cbind(agelagcombined, agelagcombined_pct[1]))
+
+## The changes in population fluctate between gains and losses plus or minus 5 percent, so the number that went from one age to another, is followed by a close figure
+##   to replace them. Keeping the number of populants in the early age category
+##   giving more of a uniform distribution to the entire us population and age
+
+plot(agelagcombined$pct_chg, type = "o")
 
 
 
