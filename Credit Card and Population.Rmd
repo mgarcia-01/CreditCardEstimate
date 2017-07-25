@@ -2,29 +2,183 @@
 title: "Quick Credit Card Question Sample"
 author: "Michael Garcia"
 date: "7/25/2017"
-output: html_document
+output:
+  html_notebook: default
+  pdf_document: default
+  word_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+## Setting Up Data {.tabset .tabset-fade .tabset-pills}
+
+### Getting Data with census API
+
+```{r fetch Date,include=TRUE, echo=FALSE}
+library(RCurl)
+library(data.table)
+APIKEY <- fread(file.path(getwd(),paste("CensusAPIKEY",".csv",sep = "")), header = TRUE)
+censusGEOURL <- paste0("https://api.census.gov/data/2016/pep/population?get=POP,DENSITY,GEONAME&for=state:*&key=",APIKEY)
+censusAGEURL <- paste0("https://api.census.gov/data/2016/pep/natmonthly?get=POP,MONTHLY,AGE,GEONAME&for=us:*&key=",APIKEY)
+rm(APIKEY)
 ```
 
-## R Markdown
+### Parsing Data: Population and Geography
+
+
+```{r  population,include=TRUE, echo=TRUE}
+library(jsonlite)
+### this is to parse the census for us population by state, no age.
+myjsoncensus <- jsonlite::fromJSON(txt = censusGEOURL)
+uspop <- as.data.frame(myjsoncensus)
+names(uspop) <- as.character(unlist(uspop[1,]))
+uspop <- uspop[-1,]
+uspop$POP <- as.numeric(as.character(uspop$POP))
+uspop$DENSITY <- as.numeric(as.character(uspop$DENSITY))
+```
+
+### Parsing Data: Population,Month, and Age
 
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
+```{r age, include=TRUE, echo=TRUE}
+### this is to parse the census for us population by age and month 
+myjsoncensusAGE <- jsonlite::fromJSON(txt = censusAGEURL)
+uspopAGE <- as.data.frame(myjsoncensusAGE)
+names(uspopAGE) <- as.character(unlist(uspopAGE[1,]))
+uspopAGE <- uspopAGE[-1,]
+uspopAGE$POP <- as.numeric(as.character(uspopAGE$POP))
+uspopAGE$AGE <- as.numeric(as.character(uspopAGE$AGE))
+uspopAGE$MONTHLY <- as.numeric(as.character(uspopAGE$MONTHLY))
 ```
 
-## Including Plots
+## 
 
-You can also embed plots, for example:
+## Going Through Data {.tabset .tabset-fade .tabset-pills}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+### Population By Age for Dec 2016
+
+
+Population seems uniform.
+
+```{r Filter, include=TRUE,echo = TRUE}
+#plot filtered to dec 2016
+uspopAGEDist <- uspopAGE[which((uspopAGE$AGE <= 80) & (uspopAGE$AGE >= 1) & (uspopAGE$MONTHLY == 94)),]
+plot(x=uspopAGEDist$AGE, y=(uspopAGEDist$POP/1000), type = "h", xlab = "AGE", ylab = "Population ('000s)")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Pct Gains and Decline By Age
+
+The changes in population fluctate between gains and losses plus or minus 5 percent, so the number that went from one age to another, is followed by a close figure to replace them. Keeping the number of populants in the early age category giving more of a uniform distribution to the entire us population and age
+
+
+``` {r pctdiff, include= TRUE, echo=TRUE}
+av <- zoo::zoo(uspopAGEDist$POP)
+agelag <- as.data.frame(lag(av,k = -1, na.pad = TRUE))
+names(agelag) <- c("agelagyr")
+
+agelagcombined <-  as.data.frame(cbind(uspopAGEDist, agelag[1]))
+agelagcombined_pct <-  as.data.frame(((agelagcombined$POP - agelagcombined$agelagyr)
+                                      /agelagcombined$agelagyr)*100)
+names(agelagcombined_pct) <- c("pct_chg")
+agelagcombined <-  as.data.frame(cbind(agelagcombined, agelagcombined_pct[1]))
+plot(agelagcombined$pct_chg, type = "o")
+```
+
+##
+
+
+## Normal Distribution: Population Values {.tabset .tabset-fade .tabset-pills}
+
+### Setting Up Distributions
+Using the values for one two and three standard deviations
+Use either method to return population  value :
+
+``` {r deviations, include= TRUE, echo = TRUE}
+onedev <- .68*max(uspop$POP)
+twodev <- .95*max(uspop$POP)
+threedev <- .9967*max(uspop$POP)
+```
+
+
+* One Deviation : `r paste(onedev)`
+* Two Deviation: `r paste(twodev)`
+* Three Deviation: `r paste(twodev)`
+
+
+or use this quickly built basic function and enter a value between 1 and 3:
+
+``` {r fundev, include = TRUE, echo = TRUE}
+QtyPopulationByDev <- function(no_deviations = 1){
+  if(no_deviations == 1){devValue <- .68*max(uspop$POP)}
+      else if(no_deviations == 2){devValue <- .95*max(uspop$POP)}
+          else if(no_deviations == 3){devValue <- .9967*max(uspop$POP)}
+  return(devValue)
+}
+```
+
+
+So 2 deviations results in `r QtyPopulationByDev(no_deviations = 2)`
+
+### Age range estimates per deviation: Normal Distribution
+
+``` {r include = TRUE, echo = TRUE}
+#age range between 1 and 80 at 1 deviation
+agemedian <- 80/2
+AgeonedevLow <- (agemedian*(1-(.68/2)))
+AgeonedevHigh <- (agemedian*(1+(.68/2)))
+# normal distribution on 2 deviations. 95 percent
+AgetwodevLow <- (agemedian*(1-(.95/2)))
+AgetwodevHigh <- (agemedian*(1+(.95/2)))
+#normal at 3 deviations, 99.7
+AgethreedevLow <- (agemedian*(1-(.997/2)))
+AgethreedevHigh <- (agemedian*(1+(.997/2)))
+```
+
+Using the source above:
+
+* The population falls between `r paste(round(AgeonedevLow,0))`   and  `r paste(round(AgeonedevHigh,0))`  at 1 deviation
+* The population falls between `r paste(round(AgetwodevLow,0))`   and  `r paste(round(AgetwodevHigh,0))`  at 2 deviations
+* The population falls between `r paste(round(AgethreedevLow,0))`   and  `r paste(round(AgethreedevHigh,0))`  at 3 deviations
+
+
+Based on a normal distribution, what amount of population do not have credit cards based on legal age to apply?
+
+
+``` {r populationearlyage, include = TRUE, echo = TRUE}
+# normal distribution outside 95 percent that are cannot have credit cards
+qty_Popul_earlyAge <- (((1-.95)/2)*sum(uspop$POP))
+CensusEarlyAge <- sum(uspopAGEDist[which(uspopAGEDist$AGE >= 1 & uspopAGEDist$AGE <= 21),"POP"])
+CensusAdultAge <- sum(uspopAGEDist[which(uspopAGEDist$AGE >= 21),"POP"])
+Total_Number_CreditCards <- as.numeric(1895834000)                
+Total_Number_CardHolders <- as.numeric(199800000)  
+```
+
+* `r paste(round(qty_Popul_earlyAge,0))` are left of the distribution outside of 2 deviations or 95 percent that do have credit cards.
+* `r paste(round(CensusEarlyAge))` is the actual value that is given in the census data for December 2016
+* `r paste(round(CensusEarlyAge - qty_Popul_earlyAge,0)) ` is a large difference, which makes sense looking at the trend that about 5 percent flow from one age bracket to another, and resulting in a uniform distribution as seen on the Census Chart (see Going Through Data graphs).
+
+* `r paste(CensusAdultAge)` are probably eligble for a credit card. According to statistics brain (from source derived from FRBNY) there are `r paste(Total_Number_CreditCards)` number of credit cards and `r paste(Total_Number_CardHolders)` cardholders. Thats about `r paste(round(Total_Number_CreditCards/Total_Number_CardHolders,0))` credit cards per cardholder.
+
+##
+
+
+##### Licensed Under GNU AFFERO GENERAL PUBLIC LICENSE
+
+    <Quick Sample of Distribution of Population>
+    Copyright (C) 2017  Michael Garcia. All Rights Reserved.
+    Contact: mgar_datascience at protonmail dot com 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.

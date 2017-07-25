@@ -17,7 +17,7 @@ rm(APIKEY)
 library(jsonlite)
 
 ### this is to parse the census for us population by state, no age.
-myjsoncensus <- jsonlite::fromJSON(txt = censusURL)
+myjsoncensus <- jsonlite::fromJSON(txt = censusGEOURL)
 uspop <- as.data.frame(myjsoncensus)
 names(uspop) <- as.character(unlist(uspop[1,]))
 uspop <- uspop[-1,]
@@ -48,16 +48,49 @@ Total_Number_CreditCards <- as.numeric(1895834000)
 Total_Number_CardHolders <- as.numeric(199800000)                 
 
 #plot filtered to dec 2016
-uspopAGEDist <- uspopAGE[which((uspopAGE$AGE <= 80) & (uspopAGE$AGE >= 1) & (uspopAGE$MONTHLY == 94)),]
-plot(x=uspopDist$AGE, y=(uspopAGEDist$POP/1000), type = "o")
-max(uspopAGE$POP)
+uspopAGEDist <- as.data.frame(uspopAGE[which(((uspopAGE$AGE <= 80) & (uspopAGE$AGE >= 1)) & (uspopAGE$MONTHLY == 94)),])
+plot(x=uspopAGEDist$AGE, y=(uspopAGEDist$POP/1000), type = "o", xlab = "AGE", ylab = "Population ('000s)")
+#max(uspopAGE$POP)
+
+
+
+
+
+av <- zoo::zoo(uspopAGEDist$POP)
+agelag <- as.data.frame(lag(av,k = -1, na.pad = TRUE))
+names(agelag) <- c("agelagyr")
+
+agelagcombined <-  as.data.frame(cbind(uspopAGEDist, agelag[1]))
+agelagcombined_pct <-  as.data.frame(((agelagcombined$POP - agelagcombined$agelagyr)
+                                      /agelagcombined$agelagyr)*100)
+names(agelagcombined_pct) <- c("pct_chg")
+agelagcombined <-  as.data.frame(cbind(agelagcombined, agelagcombined_pct[1]))
+plot(agelagcombined$pct_chg, type = "o")
+## The changes in population fluctate between gains and losses plus or minus 5 percent, so the number that went from one age to another, is followed by a close figure
+##   to replace them. Keeping the number of populants in the early age category
+##   giving more of a uniform distribution to the entire us population and age
+
+
+
 
 # If we use normal distribution . using a distribution table
 onedev <- .68*max(uspop$POP)
 twodev <- .95*max(uspop$POP)
 threedev <- .9967*max(uspop$POP)
 
-#age range between 1 and 80 then
+QtyPopulationByDev <- function(no_deviations = 1){
+  if(no_deviations == 1){devValue <- .68*max(uspop$POP)}
+      else if(no_deviations == 2){devValue <- .95*max(uspop$POP)}
+          else if(no_deviations == 3){devValue <- .9967*max(uspop$POP)}
+  return(devValue)
+  }
+  
+
+#QtyPopulationByDev(no_deviations = 3)
+  
+  
+
+#age range between 1 and 80 at 1 deviation
 agemedian <- 80/2
 AgeonedevLow <- (agemedian*(1-(.68/2)))
 AgeonedevHigh <- (agemedian*(1+(.68/2)))
@@ -80,24 +113,10 @@ CensusEarlyAge <- sum(uspopAGEDist[which(uspopAGEDist$AGE >= 1 & uspopAGEDist$AG
 ###  then followed by low rate of births. we can check the census 2016 to get an idea of rate of "transfer" between ages. Not sure
 ### if there is a terminology for this.
 
-head(uspopAGEDist,10)
 
-tempset <- as.data.frame(basketTrend_DepAisle(department = "frozen", aisle = "ice cream ice"))
-av <- zoo::zoo(uspopAGEDist$POP)
-agelag <- as.data.frame(lag(av,k = -1, na.pad = TRUE))
-names(agelag) <- c("agelagyr")
 
-agelagcombined <-  as.data.frame(cbind(uspopAGEDist, agelag[1]))
-agelagcombined_pct <-  as.data.frame(((agelagcombined$POP - agelagcombined$agelagyr)
-                                      /agelagcombined$agelagyr)*100)
-names(agelagcombined_pct) <- c("pct_chg")
-agelagcombined <-  as.data.frame(cbind(agelagcombined, agelagcombined_pct[1]))
 
-## The changes in population fluctate between gains and losses plus or minus 5 percent, so the number that went from one age to another, is followed by a close figure
-##   to replace them. Keeping the number of populants in the early age category
-##   giving more of a uniform distribution to the entire us population and age
 
-plot(agelagcombined$pct_chg, type = "o")
 
 
 
