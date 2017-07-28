@@ -8,11 +8,15 @@ output:
   word_document: default
 ---
 
+##### Update 07/27/2017
+  RChunk in Getting Data with census API was hidden due to echo = FALSE. It is now visible. To run: obtain an API Key at https://www.census.gov/developers/ and store in local directory as file name = CensusAPIKEY and format csv, first row, first column. APIKEY Variable is set to read from this file and the local directory path.
+
+
 ## Setting Up Data {.tabset .tabset-fade .tabset-pills}
 
 ### Getting Data with census API
 
-```{r fetch Date,include=TRUE, echo=FALSE}
+```{r fetch Date,include=TRUE, echo=TRUE}
 library(RCurl)
 library(data.table)
 APIKEY <- fread(file.path(getwd(),paste("CensusAPIKEY",".csv",sep = "")), header = TRUE)
